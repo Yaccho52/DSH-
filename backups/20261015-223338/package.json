@@ -1,0 +1,38 @@
+{
+  "name": "dsh-whale-balance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "鲸鱼娘余额气泡：DSH Web GUI 右下角浮层，用 DeepSeek 二次元形象「鲸鱼娘」的聊天气泡实时显示账号充值/赠金余额。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "assets",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.0-rc.2"
+  },
+  "meta": {
+    "title": "鲸鱼娘余额气泡",
+    "description": "以 DeepSeek 鲸鱼娘聊天气泡的形式，实时显示账号余额；可拖动、可折叠、余额不足会告警。"
+  }
+}

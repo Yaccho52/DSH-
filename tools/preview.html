@@ -1,0 +1,27 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>鲸鱼娘余额插件 · 交互预览</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f8fc;color:#243550;font:15px/1.65 system-ui,"Microsoft YaHei",sans-serif}main{max-width:1000px;margin:60px auto;padding:0 35px}small{color:#5f7eae;letter-spacing:2px}h1{font-size:32px;line-height:1.35;margin:12px 0}p{color:#76849a}section{margin-top:32px;background:white;border:1px solid #e5ebf4;border-radius:20px;padding:28px;box-shadow:0 12px 45px #19346b05}button{font:inherit;border:1px solid #dce4f2;background:#fff;border-radius:10px;padding:8px 15px;color:#40567b;cursor:pointer;margin-right:8px}button:hover{background:#f0f5ff}.note{padding-top:12px;font-size:13px}.status{padding:5px 10px;background:#e8f0ff;border-radius:6px;color:#5375ad;font-size:12px}#test-state{font-variant-numeric:tabular-nums}body[data-dark=true]{background:#171d2a;color:#e6ecf8}body[data-dark=true] section{background:#202938;border-color:#2c374a}body[data-dark=true] p{color:#a0aec5}body[data-dark=true] button{background:#263249;border-color:#42516b;color:#dae6ff}
+</style>
+<main><small>DEEPSEEK HARNESS · WHALE BALANCE</small><h1>鲸鲸陪你，余额在这里。</h1><p>右下角是实际插件组件。点击人物，依次切换余额、好女孩、哦鲸鲸。<br>按住人物可拖动，悬停后可刷新余额或收起。</p>
+<section><span class="status">交互预览 · 仅使用演示数据</span><p>这里不会读取真实账号，也不会发送模型请求。</p>
+<button id="spend" type="button">模拟消耗 ¥0.25</button><button id="failure" type="button">模拟查询失败</button><button id="logout" type="button">模拟退出登录</button><button id="reset" type="button">恢复正常</button><button id="theme" type="button">切换深色背景</button><button id="unmount" type="button">卸载组件</button>
+<p class="note" id="test-state">正在加载组件…</p></section></main><div id="preview-root"></div>
+<script src="/vendor.js"></script><script>
+window.__previewErrors=[];window.addEventListener('error',e=>window.__previewErrors.push(e.message));
+window.__ModuleLoader__={load(entry){window.previewPlugin=entry.factory(window.__previewRequire)}};
+</script><script src="/client.js"></script><script>
+const React=window.__previewRequire('react');const {createRoot}=window.__previewRequire('react-dom/client');
+let amount='42.50',failure=false,signedOut=false;const effects=[];let streamResolve;let streamNext=new Promise(r=>streamResolve=r);let renderRoot;
+const stream={async *[Symbol.asyncIterator](){while(true){const value=await streamNext;if(value===null)return;streamNext=new Promise(r=>streamResolve=r);yield {value,accept(){}}}},dispose(){streamResolve(null)}};
+const ctx={locale:{getSnapshot:()=>({active:'zh'})},get:()=>remote,effect(fn){effects.push(fn())},slots:{inject(name,fn){effects.push(fn())},register(spec,Component){
+const props=spec.inject();window.previewController=props.whaleBalance.controller;renderRoot=createRoot(document.getElementById('preview-root'));renderRoot.render(React.createElement(Component,props));return()=>renderRoot.unmount();}}};
+const remote={account:{async getBalance(){await new Promise(r=>setTimeout(r,180));if(failure)return {ok:false};if(signedOut)return {ok:true,value:null};return {ok:true,value:{status:'ready',value:[{currency:'CNY',balance:amount}],bonusWallets:[{currency:'CNY',balance:'3.25'}]}}},watch(){}},$stream:()=>stream};
+window.previewPlugin.apply(ctx);
+window.previewController.subscribe(()=>{const s=window.previewController.getSnapshot();document.getElementById('test-state').textContent=`当前内容：${window.previewPlugin.__test.bubbleContent(s).label} · 互动 ${s.clicks} 次 · ${s.refreshing?'刷新中':s.phase}`});
+document.getElementById('spend').onclick=()=>{amount=(Number(amount)-.25).toFixed(2);window.previewController.refresh()};
+document.getElementById('failure').onclick=()=>{failure=true;window.previewController.refresh()};
+document.getElementById('logout').onclick=()=>{signedOut=true;streamResolve({status:'signed-out'})};
+document.getElementById('reset').onclick=()=>{failure=false;signedOut=false;streamResolve({status:'credential-stored'})};
+document.getElementById('theme').onclick=()=>{document.body.dataset.dark=document.body.dataset.dark!=='true'};
+document.getElementById('unmount').onclick=()=>{for(const stop of effects.reverse())stop?.();document.getElementById('test-state').textContent='组件已卸载；图片、样式、轮询与监听均已清理。'};
+</script></html>

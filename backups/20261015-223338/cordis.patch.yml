@@ -1,0 +1,8 @@
+# dsh-whale-balance bundle layer.
+#
+# The host half only publishes three read-only assets under /api/whale-balance/*;
+# the visible widget is the browser half (dsh.client -> lib/client.js), which
+# registers into the root-scoped 'shell.overlay' list slot.
+- insert:
+    - id: whale-balance
+      name: dsh-whale-balance

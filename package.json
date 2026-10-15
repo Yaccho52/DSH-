@@ -1,0 +1,46 @@
+{
+  "name": "dsh-whale-balance",
+  "version": "0.2.2",
+  "private": true,
+  "description": "DSH 账号余额的鲸鱼娘表情包气泡：点击人物轮换台词并弹跳回应。",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "assets",
+    "tools/build.mjs",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node --test test/client.test.mjs",
+    "verify": "node tools/verify-profile.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.0-rc.2"
+  },
+  "meta": {
+    "title": "鲸鱼娘余额气泡",
+    "description": "显示余额 → 好女孩 → 哦鲸鲸；点击弹跳、自动刷新、拖动和收起。"
+  },
+  "devDependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

@@ -57,6 +57,34 @@ window.__ModuleLoader__.load({
         return { currency, text: tiny ? (negative ? '> -0.0001' : '< 0.0001') : `${sign}${whole}.${fraction}` };
       });
     }
+    // DeepSeek bills peak rates 01:00-04:00 and 06:00-10:00 UTC, Monday through
+    // Friday; every other hour is off-peak, including weekends and Chinese public
+    // holidays in full. The two peak windows are separate: 04:00-06:00 UTC is
+    // off-peak. Holidays are not derived here (that needs a maintained calendar),
+    // so a holiday weekday inside a peak window still reads as peak.
+    const PEAK_HOURS_UTC = [[1, 4], [6, 10]];
+    /** Rotation stop reserved for the billing-period line. */
+    const TIER_MODE = 3;
+    /** How many lines the click rotation walks through. */
+    const MODE_COUNT = 4;
+    const TIER = { peak: 'peak', off: 'off' };
+    const TIER_LINE = { peak: '梁文峰...', off: '梁文谷!!!' };
+    /**
+     * Current billing period by the official UTC schedule.
+     * @param now - instant to classify.
+     * @returns `'peak'` inside a weekday peak window, otherwise `'off'`.
+     */
+    function billingTier(now = new Date()) {
+      const time = now instanceof Date ? now : new Date(now);
+      if (Number.isNaN(time.getTime())) return TIER.off;
+      const day = time.getUTCDay();               // 0 Sunday … 6 Saturday
+      if (day === 0 || day === 6) return TIER.off;
+      const minutes = time.getUTCHours() * 60 + time.getUTCMinutes();
+      for (const [from, to] of PEAK_HOURS_UTC) {
+        if (minutes >= from * 60 && minutes < to * 60) return TIER.peak;
+      }
+      return TIER.off;
+    }
     function readStored() {
       try {
         const data = JSON.parse(W.localStorage.getItem(STORAGE) ?? '{}');
@@ -75,10 +103,14 @@ window.__ModuleLoader__.load({
     function createController(api, options = {}) {
       const timers = options.timers ?? W;
       const stored = options.stored ?? readStored();
+      const clock = options.now ?? (() => new Date());
       const listeners = new Set();
       let state = {
         mode: 0, clicks: 0, phase: 'idle', refreshing: false,
         wallets: [], bonusWallets: [], updatedAt: null, error: null,
+        // Current billing period; re-derived on every refresh and on every render,
+        // so a click can never show a stale peak/off-peak line.
+        tier: billingTier(clock()),
         collapsed: stored.collapsed === true,
         position: clampPosition(stored.position, undefined, undefined, stored.collapsed === true),
       };
@@ -112,6 +144,10 @@ window.__ModuleLoader__.load({
         if (disposed) return Promise.resolve();
         if (pending) return pending;
         const requestEpoch = epoch;
+        // The billing window can roll over between polls; re-derive it on every refresh
+        // so the rotation never shows the wrong peak/off-peak line.
+        const tier = billingTier(clock());
+        if (tier !== state.tier) emit({ tier });
         const remote = getRemote();
         if (typeof remote?.account?.getBalance !== 'function') {
           emit({ phase: 'error', refreshing: false, error: '余额服务未连接' });
@@ -167,7 +203,9 @@ window.__ModuleLoader__.load({
         getSnapshot: () => state,
         subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
         click() {
-          emit({ mode: (state.mode + 1) % 3, clicks: state.clicks + 1 });
+          // Peak and off-peak lines occupy the same rotation stop, so only one of them
+          // can ever be shown; the tier is re-read here in case the window rolled over.
+          emit({ mode: (state.mode + 1) % MODE_COUNT, clicks: state.clicks + 1, tier: billingTier(clock()) });
           if (state.mode === 0) void refresh();
         },
         refresh,
@@ -205,6 +243,12 @@ window.__ModuleLoader__.load({
     function bubbleContent(state) {
       if (state.mode === 1) return { label: '好女孩', detail: '' };
       if (state.mode === 2) return { label: '哦鲸鲸', detail: '' };
+      // One rotation stop, two mutually exclusive lines: whichever the current billing
+      // period selects. Peak and off-peak can never appear together.
+      if (state.mode === TIER_MODE) {
+        const tier = state.tier === TIER.peak ? TIER.peak : TIER.off;
+        return { label: TIER_LINE[tier], detail: tier === TIER.peak ? '计费峰时' : '计费谷时' };
+      }
       if (!state.updatedAt) {
         if (state.phase === 'signed-out') return { label: '请先登录', detail: '登录 DSH 账号后显示余额' };
         if (state.phase === 'error') return { label: '查询失败', detail: state.error ?? '余额服务暂未连接' };
@@ -313,7 +357,7 @@ window.__ModuleLoader__.load({
       return h('div', {
         className: 'dshwb2', 'data-collapsed': state.collapsed, 'data-error': state.phase === 'error' || state.phase === 'signed-out',
         style: { left: state.position.left, top: state.position.top, transform: `scale(${scale})` },
-        'data-whale-balance': '0.2.2',
+        'data-whale-balance': '0.2.3',
       }, !state.collapsed && h('div', { className: 'dshwb2-bubble', title },
         h('img', { src: BUBBLE, alt: '', draggable: false }),
         h('div', { className: 'dshwb2-words', role: 'status', 'aria-live': 'polite', 'aria-atomic': true },
@@ -350,7 +394,7 @@ window.__ModuleLoader__.load({
       });
       ctx.effect(() => {
         const style = document.createElement('style');
-        style.dataset.whaleBalanceStyle = '0.2.2'; style.textContent = CSS;
+        style.dataset.whaleBalanceStyle = '0.2.3'; style.textContent = CSS;
         document.head.appendChild(style);
         return () => style.remove();
       }, 'whale-balance: styles');
@@ -373,7 +417,7 @@ window.__ModuleLoader__.load({
       // throws `cannot get property "remote.account" without inject`, which used to abort
       // activation before the overlay was ever registered.
       name: 'whale-balance', inject: ['slots', 'locale', 'remote.account'], apply,
-      __test: { decimal, money, createController, bubbleContent, clampPosition, Widget, CSS, ART, BUBBLE, apply },
+      __test: { decimal, money, createController, bubbleContent, clampPosition, Widget, CSS, ART, BUBBLE, apply, billingTier, TIER, TIER_LINE, TIER_MODE, MODE_COUNT },
     };
   },
 });

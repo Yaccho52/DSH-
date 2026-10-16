@@ -1,8 +1,8 @@
 {
   "name": "dsh-whale-balance",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
-  "description": "DSH 账号余额的鲸鱼娘表情包气泡：点击人物轮换台词并弹跳回应。",
+  "description": "DSH 账号余额的鲸鱼娘表情包气泡：点击人物轮换台词（含计费峰谷时段台词）并弹跳回应。",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {

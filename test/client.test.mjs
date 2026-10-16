@@ -65,9 +65,76 @@ test('every click advances immediately; polling never overwrites the selected li
   c.click(); assert.equal(bubbleContent(c.getSnapshot()).label, '好女孩');
   await c.refresh(); assert.equal(bubbleContent(c.getSnapshot()).label, '好女孩');
   c.click(); assert.equal(bubbleContent(c.getSnapshot()).label, '哦鲸鲸');
+  c.click();
+  // The fourth stop is the billing-period line: exactly one of the two lamp lines.
+  const tier = c.getSnapshot().tier;
+  const tierLabel = bubbleContent(c.getSnapshot()).label;
+  assert.ok(tierLabel === '梁文峰...' || tierLabel === '梁文谷!!!', tierLabel);
+  assert.equal(tierLabel, tier === 'peak' ? '梁文峰...' : '梁文谷!!!');
   c.click(); assert.equal(bubbleContent(c.getSnapshot()).label, '¥1.23');
-  assert.equal(c.getSnapshot().clicks, 3);
+  assert.equal(c.getSnapshot().clicks, 4);
   await c.refresh(); assert.equal(calls, 3);
+  c.dispose();
+});
+// DeepSeek bills peak rates 01:00-04:00 and 06:00-10:00 UTC on weekdays only; every
+// other instant is off-peak. The two peak windows are separate, so 04:00-06:00 UTC is
+// off-peak, and weekends are off-peak in full.
+test('billing tier follows the official UTC peak windows on weekdays only', () => {
+  const { billingTier } = load();
+  const at = (iso) => billingTier(new Date(iso));
+  // 2026-10-14 is a Wednesday, 2026-10-17 a Saturday, 2026-10-18 a Sunday (all UTC).
+  assert.equal(at('2026-10-14T00:59:59Z'), 'off', 'just before the first window');
+  assert.equal(at('2026-10-14T01:00:00Z'), 'peak', 'first window opens');
+  assert.equal(at('2026-10-14T03:59:59Z'), 'peak', 'first window still open');
+  assert.equal(at('2026-10-14T04:00:00Z'), 'off', 'between the two windows');
+  assert.equal(at('2026-10-14T05:59:59Z'), 'off', 'still between them');
+  assert.equal(at('2026-10-14T06:00:00Z'), 'peak', 'second window opens');
+  assert.equal(at('2026-10-14T09:59:59Z'), 'peak', 'second window still open');
+  assert.equal(at('2026-10-14T10:00:00Z'), 'off', 'second window closes');
+  assert.equal(at('2026-10-14T23:30:00Z'), 'off', 'evening is off-peak');
+  assert.equal(at('2026-10-17T02:00:00Z'), 'off', 'Saturday inside a peak window is off-peak');
+  assert.equal(at('2026-10-18T07:00:00Z'), 'off', 'Sunday inside a peak window is off-peak');
+  assert.equal(billingTier(new Date('nonsense')), 'off', 'an invalid clock is off-peak, never peak');
+});
+// The two lamp lines share one rotation stop, so both can never be shown at once.
+test('peak and off-peak lines are mutually exclusive', () => {
+  const { bubbleContent, TIER, TIER_LINE, TIER_MODE, MODE_COUNT } = load();
+  assert.equal(TIER_LINE[TIER.peak], '梁文峰...');
+  assert.equal(TIER_LINE[TIER.off], '梁文谷!!!');
+  assert.notEqual(TIER_LINE[TIER.peak], TIER_LINE[TIER.off]);
+  assert.equal(MODE_COUNT, 4);
+  const base = { mode: TIER_MODE, phase: 'ready', wallets: [], bonusWallets: [], updatedAt: '2026-10-14T02:00:00Z', error: null };
+  const peak = bubbleContent({ ...base, tier: TIER.peak });
+  const off = bubbleContent({ ...base, tier: TIER.off });
+  assert.equal(peak.label, '梁文峰...');
+  assert.equal(off.label, '梁文谷!!!');
+  assert.equal(peak.detail, '计费峰时');
+  assert.equal(off.detail, '计费谷时');
+  // Walk the whole rotation in each tier and assert the other line never appears.
+  for (const [tier, own, other] of [[TIER.peak, '梁文峰...', '梁文谷!!!'], [TIER.off, '梁文谷!!!', '梁文峰...']]) {
+    const seen = [];
+    for (let mode = 0; mode < MODE_COUNT; mode++) seen.push(bubbleContent({ ...base, mode, tier }).label);
+    assert.ok(seen.includes(own), `${tier} rotation shows its own line`);
+    assert.ok(!seen.includes(other), `${tier} rotation never shows the other line`);
+  }
+});
+// The tier is re-derived on every refresh and click, so a window rollover cannot leave
+// a stale line on screen.
+test('the tier follows the clock across a window rollover', async () => {
+  const { createController, bubbleContent } = load();
+  let now = new Date('2026-10-14T03:30:00Z');   // inside the first peak window
+  const c = createController(
+    { ...api(async () => ready('9.99')) },
+    { now: () => now },
+  );
+  await c.refresh();
+  assert.equal(c.getSnapshot().tier, 'peak');
+  c.click(); c.click(); c.click();
+  assert.equal(bubbleContent(c.getSnapshot()).label, '梁文峰...');
+  now = new Date('2026-10-14T05:00:00Z');       // the 04:00-06:00 off-peak gap
+  await c.refresh();
+  assert.equal(c.getSnapshot().tier, 'off');
+  assert.equal(bubbleContent(c.getSnapshot()).label, '梁文谷!!!');
   c.dispose();
 });
 test('repeated refreshes coalesce; returning to balance refreshes the live amount', async () => {
@@ -76,7 +143,7 @@ test('repeated refreshes coalesce; returning to balance refreshes the live amoun
   const c = createController(api(() => { calls++; return new Promise(resolve => { settle = resolve; }); }));
   const first = c.refresh();
   assert.equal(c.refresh(), first);
-  c.click(); c.click(); c.click();
+  c.click(); c.click(); c.click(); c.click();
   assert.equal(c.getSnapshot().mode, 0);
   await tick(); assert.equal(calls, 1);
   settle(ready('42.1234')); await first;
